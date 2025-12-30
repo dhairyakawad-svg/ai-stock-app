@@ -7,7 +7,9 @@ st.set_page_config(page_title="AI Stock Analyzer", layout="centered")
 st.title("📊 AI Stock Analyzer")
 st.write("Educational stock analysis tool (Not financial advice)")
 
-ticker = st.text_input("Enter stock ticker (Example: AAPL, TSLA, MSFT)")
+ticker = st.text_input(
+    "Enter stock ticker (Example: AAPL, TSLA, MSFT)"
+).upper().strip()
 
 def calculate_rsi(data, period=14):
     delta = data.diff()
@@ -21,6 +23,27 @@ def calculate_rsi(data, period=14):
     rsi = 100 - (100 / (1 + rs))
     return rsi
 
+def ai_explanation(rsi_value):
+    if rsi_value < 30:
+        return (
+            "The stock appears **oversold** based on the RSI indicator. "
+            "This means selling pressure has been strong recently. "
+            "Historically, oversold conditions can sometimes lead to short-term rebounds, "
+            "but this is not guaranteed and market risks remain."
+        )
+    elif rsi_value > 70:
+        return (
+            "The stock appears **overbought** based on the RSI indicator. "
+            "This suggests strong recent buying activity. "
+            "Overbought conditions can sometimes be followed by pullbacks or consolidation."
+        )
+    else:
+        return (
+            "The stock is in a **neutral** RSI range. "
+            "This suggests balanced buying and selling pressure, "
+            "with no strong momentum signal at the moment."
+        )
+
 if st.button("Analyze"):
     if ticker == "":
         st.error("Please enter a stock ticker")
@@ -32,7 +55,6 @@ if st.button("Analyze"):
             st.error("Invalid ticker or no data found")
         else:
             data["RSI"] = calculate_rsi(data["Close"])
-
             latest_rsi = data["RSI"].iloc[-1]
 
             st.subheader("📈 Stock Price (Last 1 Year)")
@@ -41,18 +63,19 @@ if st.button("Analyze"):
             st.subheader("📉 RSI Indicator")
             st.line_chart(data["RSI"])
 
-            st.subheader("🧠 Analysis Result")
+            st.subheader("🧠 AI-Style Analysis")
 
             if latest_rsi < 30:
-                st.success("RSI indicates the stock may be **OVERSOLD** → Educational BUY signal")
+                st.success("Educational Signal: BUY (Oversold)")
             elif latest_rsi > 70:
-                st.warning("RSI indicates the stock may be **OVERBOUGHT** → Educational AVOID signal")
+                st.warning("Educational Signal: AVOID (Overbought)")
             else:
-                st.info("RSI indicates **NEUTRAL** conditions → HOLD signal")
+                st.info("Educational Signal: HOLD (Neutral)")
 
-            st.write(f"📌 Current RSI value: **{latest_rsi:.2f}**")
+            st.write(f"📌 Current RSI: **{latest_rsi:.2f}**")
+            st.write(ai_explanation(latest_rsi))
 
             st.warning(
-                "⚠️ This app provides educational market analysis only. "
-                "It is NOT financial advice. Always consult a licensed financial advisor."
+                "⚠️ This platform provides educational market analysis only. "
+                "It is NOT financial advice. No guarantees are provided."
             )
