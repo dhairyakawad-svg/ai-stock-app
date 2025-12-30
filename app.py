@@ -8,8 +8,10 @@ st.title("📊 AI Stock Analyzer")
 st.write("Educational stock analysis tool (Not financial advice)")
 
 ticker = st.text_input(
-    "Enter stock ticker (Example: AAPL, TSLA, MSFT)"
+    "Enter stock ticker (Example: AAPL, TSLA, MRF.NS)"
 ).upper().strip()
+
+# ---------------- TECHNICAL ANALYSIS ---------------- #
 
 def calculate_rsi(data, period=14):
     delta = data.diff()
@@ -23,26 +25,43 @@ def calculate_rsi(data, period=14):
     rsi = 100 - (100 / (1 + rs))
     return rsi
 
-def ai_explanation(rsi_value):
-    if rsi_value < 30:
-        return (
-            "The stock appears **oversold** based on the RSI indicator. "
-            "This means selling pressure has been strong recently. "
-            "Historically, oversold conditions can sometimes lead to short-term rebounds, "
-            "but this is not guaranteed and market risks remain."
-        )
-    elif rsi_value > 70:
-        return (
-            "The stock appears **overbought** based on the RSI indicator. "
-            "This suggests strong recent buying activity. "
-            "Overbought conditions can sometimes be followed by pullbacks or consolidation."
-        )
+def technical_signal(rsi):
+    if rsi < 30:
+        return "BUY", "RSI indicates oversold conditions"
+    elif rsi > 70:
+        return "AVOID", "RSI indicates overbought conditions"
     else:
-        return (
-            "The stock is in a **neutral** RSI range. "
-            "This suggests balanced buying and selling pressure, "
-            "with no strong momentum signal at the moment."
-        )
+        return "HOLD", "RSI is in a neutral range"
+
+# ---------------- FUNDAMENTAL ANALYSIS ---------------- #
+
+def fundamental_signal(info):
+    pe = info.get("trailingPE")
+    market_cap = info.get("marketCap")
+    debt = info.get("totalDebt")
+
+    score = 0
+    reasons = []
+
+    if pe and pe < 25:
+        score += 1
+        reasons.append("Reasonable P/E ratio")
+    elif pe:
+        reasons.append("High P/E ratio")
+
+    if market_cap:
+        score += 1
+        reasons.append("Strong market capitalization")
+
+    if debt and market_cap and debt < market_cap * 0.5:
+        score += 1
+        reasons.append("Debt level appears manageable")
+    elif debt:
+        reasons.append("High debt level")
+
+    return score, reasons
+
+# ---------------- MAIN LOGIC ---------------- #
 
 if st.button("Analyze"):
     if ticker == "":
@@ -50,32 +69,6 @@ if st.button("Analyze"):
     else:
         stock = yf.Ticker(ticker)
         data = stock.history(period="1y")
+        info = stock.info
 
         if data.empty:
-            st.error("Invalid ticker or no data found")
-        else:
-            data["RSI"] = calculate_rsi(data["Close"])
-            latest_rsi = data["RSI"].iloc[-1]
-
-            st.subheader("📈 Stock Price (Last 1 Year)")
-            st.line_chart(data["Close"])
-
-            st.subheader("📉 RSI Indicator")
-            st.line_chart(data["RSI"])
-
-            st.subheader("🧠 AI-Style Analysis")
-
-            if latest_rsi < 30:
-                st.success("Educational Signal: BUY (Oversold)")
-            elif latest_rsi > 70:
-                st.warning("Educational Signal: AVOID (Overbought)")
-            else:
-                st.info("Educational Signal: HOLD (Neutral)")
-
-            st.write(f"📌 Current RSI: **{latest_rsi:.2f}**")
-            st.write(ai_explanation(latest_rsi))
-
-            st.warning(
-                "⚠️ This platform provides educational market analysis only. "
-                "It is NOT financial advice. No guarantees are provided."
-            )
