@@ -13,82 +13,73 @@ ticker = st.text_input(
 
 # ---------------- FUNDAMENTAL LOGIC ---------------- #
 def fundamental_analysis(stock):
-    info = stock.info
+    info = stock.fast_info   # ✅ reliable
+    financials = stock.financials
 
-    data = {
-        "Company Name": info.get("longName"),
-        "Current Price": info.get("currentPrice"),
-        "Market Cap": info.get("marketCap"),
-        "P/E Ratio": info.get("trailingPE"),
-        "Book Value": info.get("bookValue"),
-        "ROE": info.get("returnOnEquity"),
-        "Debt to Equity": info.get("debtToEquity")
-    }
+    current_price = info.get("last_price")
+    market_cap = info.get("market_cap")
+
+    # Financial statement values
+    revenue = None
+    net_income = None
+
+    if financials is not None and not financials.empty:
+        revenue = financials.loc["Total Revenue"].iloc[0] if "Total Revenue" in financials.index else None
+        net_income = financials.loc["Net Income"].iloc[0] if "Net Income" in financials.index else None
 
     score = 0
     reasons = []
 
-    pe = data["P/E Ratio"]
-    roe = data["ROE"]
-    debt_equity = data["Debt to Equity"]
-
-    if pe and pe < 25:
+    if market_cap:
         score += 1
-        reasons.append("Reasonable P/E ratio")
-    elif pe:
-        reasons.append("High P/E ratio")
+        reasons.append("Market capitalization available")
     else:
-        reasons.append("P/E ratio not available")
+        reasons.append("Market cap not available")
 
-    if roe and roe > 0.15:
-        score += 1
-        reasons.append("Strong return on equity")
-    elif roe:
-        reasons.append("Low return on equity")
+    if revenue and net_income:
+        if net_income > 0:
+            score += 1
+            reasons.append("Company is profitable")
+        else:
+            reasons.append("Company is not profitable")
     else:
-        reasons.append("ROE not available")
+        reasons.append("Profit data not available")
 
-    if debt_equity and debt_equity < 100:
-        score += 1
-        reasons.append("Debt level is manageable")
-    elif debt_equity:
-        reasons.append("High debt level")
-    else:
-        reasons.append("Debt data not available")
-
-    return data, score, reasons
+    return {
+        "Current Price": current_price,
+        "Market Cap": market_cap,
+        "Revenue": revenue,
+        "Net Income": net_income
+    }, score, reasons
 
 # ---------------- MAIN ---------------- #
 if st.button("Analyze Fundamentals"):
     if ticker == "":
         st.error("Please enter a stock ticker")
     else:
-        try:
-            stock = yf.Ticker(ticker)
-            data, score, reasons = fundamental_analysis(stock)
+        stock = yf.Ticker(ticker)
+        data = stock.history(period="1y")
 
-            if not data["Company Name"]:
-                st.error("Invalid ticker or no data found")
+        if data.empty:
+            st.error("Invalid ticker or no market data found")
+        else:
+            fundamentals, score, reasons = fundamental_analysis(stock)
+
+            st.subheader("🏢 Fundamental Data")
+            st.write(fundamentals)
+
+            st.subheader("📌 Fundamental Insights")
+            for r in reasons:
+                st.write("•", r)
+
+            st.subheader("🧠 Fundamental Verdict")
+            if score >= 2:
+                st.success("Overall Fundamentals: GOOD")
+            elif score == 1:
+                st.info("Overall Fundamentals: AVERAGE")
             else:
-                st.subheader("🏢 Company Overview")
-                st.write(data)
+                st.warning("Overall Fundamentals: WEAK")
 
-                st.subheader("📌 Fundamental Insights")
-                for r in reasons:
-                    st.write("•", r)
-
-                st.subheader("🧠 Fundamental Verdict")
-                if score >= 2:
-                    st.success("Overall Fundamentals: GOOD")
-                elif score == 1:
-                    st.info("Overall Fundamentals: AVERAGE")
-                else:
-                    st.warning("Overall Fundamentals: WEAK")
-
-                st.warning(
-                    "⚠️ This analysis is for educational purposes only. "
-                    "It is NOT financial advice."
-                )
-
-        except Exception as e:
-            st.error("Error fetching data. Try another ticker.")
+            st.warning(
+                "⚠️ Educational purpose only. Not financial advice."
+            )
