@@ -7,26 +7,32 @@ st.set_page_config(page_title="AI Stock Analyzer", layout="centered")
 st.title("📊 AI Stock Analyzer")
 st.write("Educational stock analysis tool (Not financial advice)")
 
-# ---------------- SIMPLE NAME → TICKER MAP ---------------- #
-NAME_TO_TICKER = {
-    "apple": "AAPL",
-    "tesla": "TSLA",
-    "google": "GOOGL",
-    "amazon": "AMZN",
-    "microsoft": "MSFT",
-    "mrf": "MRF.NS",
-    "reliance": "RELIANCE.NS",
-    "tcs": "TCS.NS",
-    "infosys": "INFY.NS",
-}
-
-user_input = st.text_input(
+# ---------------- COMPANY SEARCH ---------------- #
+company_query = st.text_input(
     "Enter company name or ticker (Apple, MRF, Reliance, AAPL, MRF.NS)"
-).strip().lower()
+).strip()
 
-ticker = None
-if user_input:
-    ticker = NAME_TO_TICKER.get(user_input, user_input.upper())
+selected_ticker = None
+
+if company_query:
+    try:
+        search_results = yf.search(company_query, max_results=5)
+        quotes = search_results.get("quotes", [])
+
+        if quotes:
+            ticker_options = {
+                f"{q.get('shortname', 'Unknown')} ({q.get('symbol')})": q.get("symbol")
+                for q in quotes if q.get("symbol")
+            }
+            selected_label = st.selectbox(
+                "Select the correct stock:",
+                ticker_options.keys()
+            )
+            selected_ticker = ticker_options[selected_label]
+        else:
+            st.warning("No matching companies found.")
+    except Exception as e:
+        st.error("Error searching company name.")
 
 # ---------------- TECHNICAL ANALYSIS ---------------- #
 def calculate_rsi(data, period=14):
@@ -52,42 +58,47 @@ def fundamental_signal(info):
     market_cap = info.get("market_cap")
     last_price = info.get("last_price")
 
+    score = 0
     reasons = []
 
     if pe:
-        reasons.append(f"P/E Ratio: {pe:.2f}")
+        reasons.append(f"P/E Ratio available ({pe:.2f})")
+        if pe < 25:
+            score += 1
     else:
         reasons.append("P/E Ratio not available")
 
     if market_cap:
         reasons.append("Market Cap available")
+        score += 1
     else:
         reasons.append("Market Cap not available")
 
-    return pe, market_cap, last_price, reasons
+    return score, reasons, pe, market_cap, last_price
 
 # ---------------- MAIN LOGIC ---------------- #
 if st.button("Analyze"):
-    if not ticker:
-        st.error("Please enter a company name or ticker")
+    if not selected_ticker:
+        st.error("Please select a stock first")
     else:
-        stock = yf.Ticker(ticker)
+        stock = yf.Ticker(selected_ticker)
         data = stock.history(period="1y")
         info = stock.fast_info
 
-        if data.empty:
-            st.error("Invalid ticker or no data found")
+        if data.empty or not info:
+            st.error("No data available for this stock")
         else:
             data["RSI"] = calculate_rsi(data["Close"])
             latest_rsi = data["RSI"].iloc[-1]
             tech_signal, tech_reason = technical_signal(latest_rsi)
 
-            pe, market_cap, last_price, fund_reasons = fundamental_signal(info)
+            fund_score, fund_reasons, pe, market_cap, last_price = fundamental_signal(info)
 
-            st.subheader(f"📈 {ticker} Price (1 Year)")
+            # ---------------- DISPLAY ---------------- #
+            st.subheader(f"📈 {selected_ticker} Price (1 Year)")
             st.line_chart(data["Close"])
 
-            st.subheader("📉 RSI")
+            st.subheader("📉 RSI Indicator")
             st.line_chart(data["RSI"])
 
             st.subheader("📊 Fundamental Analysis")
@@ -97,11 +108,12 @@ if st.button("Analyze"):
                 "Market Cap": market_cap if market_cap else "Not available"
             })
 
+            st.write("**Fundamental Insights:**")
             for r in fund_reasons:
                 st.write("•", r)
 
             st.subheader("🧠 Final Signal")
-            if tech_signal == "BUY":
+            if tech_signal == "BUY" and fund_score >= 1:
                 st.success("Educational Signal: BUY")
             elif tech_signal == "AVOID":
                 st.warning("Educational Signal: AVOID")
@@ -111,5 +123,6 @@ if st.button("Analyze"):
             st.write("**Technical Insight:**", tech_reason)
 
             st.warning(
-                "⚠️ Educational purpose only. Not financial advice."
+                "⚠️ This app is for educational purposes only. "
+                "It is not financial advice."
             )
