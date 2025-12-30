@@ -34,11 +34,21 @@ def technical_signal(rsi):
         return "HOLD", "RSI is in a neutral range"
 
 # ---------------- FUNDAMENTAL ANALYSIS ---------------- #
+st.subheader("📊 Fundamental Snapshot")
 
-def fundamental_signal(info):
-    pe = info.get("trailingPE")
-    market_cap = info.get("marketCap")
-    debt = info.get("totalDebt")
+pe = info.get("trailingPE", "Not available")
+market_cap = info.get("marketCap", "Not available")
+debt = info.get("totalDebt", "Not available")
+
+st.write({
+    "P/E Ratio": pe,
+    "Market Cap": market_cap,
+    "Total Debt": debt
+})
+
+if pe == "Not available" and market_cap == "Not available":
+    st.info("Fundamental data is limited for this stock from free sources.")
+
 
     score = 0
     reasons = []
